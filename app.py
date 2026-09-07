@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
 # Page Config
 st.set_page_config(
@@ -12,7 +13,7 @@ st.set_page_config(
 st.sidebar.title("📌 Navigation")
 page = st.sidebar.radio("Select Page:", ["📤 Upload Leads (Manager)", "📞 Preeti's Dialer"])
 
-# Sample Initial Data (Temporary for testing before Google Sheets connection)
+# Sample Initial Data with Calling_Date field
 if 'leads_data' not in st.session_state:
     st.session_state.leads_data = pd.DataFrame([
         {
@@ -24,7 +25,8 @@ if 'leads_data' not in st.session_state:
             "Status": "Pending",
             "Preeti_Remarks": "",
             "New_Requirement": "",
-            "Next_Followup_Date": ""
+            "Next_Followup_Date": "",
+            "Calling_Date": ""
         },
         {
             "Client_ID": "CL-0002",
@@ -35,7 +37,8 @@ if 'leads_data' not in st.session_state:
             "Status": "Pending",
             "Preeti_Remarks": "",
             "New_Requirement": "",
-            "Next_Followup_Date": ""
+            "Next_Followup_Date": "",
+            "Calling_Date": ""
         }
     ])
 
@@ -73,7 +76,8 @@ if page == "📤 Upload Leads (Manager)":
                         "Status": "Pending",
                         "Preeti_Remarks": "",
                         "New_Requirement": "",
-                        "Next_Followup_Date": ""
+                        "Next_Followup_Date": "",
+                        "Calling_Date": ""
                     })
                 
                 st.session_state.leads_data = pd.concat([st.session_state.leads_data, pd.DataFrame(new_rows)], ignore_index=True)
@@ -91,61 +95,88 @@ elif page == "📞 Preeti's Dialer":
 
     df = st.session_state.leads_data
 
-    if df.empty:
-        st.info("No leads available right now. Please upload leads first!")
-    else:
-        pending_df = df[df['Status'].isin(['Pending', 'Callback Required', 'Not Reachable'])].reset_index(drop=True)
-        
-        st.sidebar.markdown("---")
-        st.sidebar.metric("Pending Leads", len(pending_df))
-        st.sidebar.metric("Approved / Converted", len(df[df['Status'] == 'Approved/Interested']))
-        
-        if pending_df.empty:
-            st.balloons()
-            st.success("Great job! All pending leads have been updated.")
-        else:
-            if 'lead_idx' not in st.session_state:
-                st.session_state.lead_idx = 0
-            
-            if st.session_state.lead_idx >= len(pending_df):
-                st.session_state.lead_idx = 0
-                
-            current_lead = pending_df.iloc[st.session_state.lead_idx]
-            
-            col1, col2 = st.columns([1, 1])
-            
-            # Client Info Display Card
-            with col1:
-                st.subheader("📋 Client Details")
-                st.info(f"**Client ID:** {current_lead['Client_ID']}")
-                st.markdown(f"**Client Name:** {current_lead['Client_Name']}")
-                st.markdown(f"**Phone Number:** `{current_lead['Phone_Number']}`")
-                st.warning(f"**Old Requirement:** {current_lead['Old_Requirement']}")
-                st.error(f"**Rejection Reason (8 Months Ago):** {current_lead['Rejection_Reason']}")
-                
-                phone_no = str(current_lead['Phone_Number']).replace(" ", "")
-                st.markdown(f"[📞 Call Client](tel:{phone_no}) | [💬 Open WhatsApp](https://wa.me/91{phone_no})")
+    # 1. SIDEBAR METRICS BREAKDOWN (SABHI STATUSES KA COUNT)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📊 Lead Status Metrics")
+    
+    total_leads = len(df)
+    pending_cnt = len(df[df['Status'] == 'Pending'])
+    approved_cnt = len(df[df['Status'] == 'Approved/Interested'])
+    callback_cnt = len(df[df['Status'] == 'Callback Required'])
+    unreachable_cnt = len(df[df['Status'] == 'Not Reachable'])
+    rejected_cnt = len(df[df['Status'] == 'Not Interested / Rejected'])
 
-            # Call Action Form
-            with col2:
-                st.subheader("📝 Update Call Status")
-                with st.form("update_form"):
-                    new_status = st.selectbox(
-                        "Call Status",
-                        ["Approved/Interested", "Callback Required", "Not Reachable", "Not Interested / Rejected"]
-                    )
-                    new_req = st.text_area("New Requirement (If Approved)", value=str(current_lead.get('New_Requirement', '')))
-                    remarks = st.text_area("Preeti's Remarks / Discussion", value=str(current_lead.get('Preeti_Remarks', '')))
-                    next_date = st.date_input("Next Follow-up Date")
+    st.sidebar.metric("Total Leads", total_leads)
+    st.sidebar.metric("⏳ Pending", pending_cnt)
+    st.sidebar.metric("✅ Approved", approved_cnt)
+    st.sidebar.metric("📞 Callback Required", callback_cnt)
+    st.sidebar.metric("🚫 Not Reachable", unreachable_cnt)
+    st.sidebar.metric("❌ Rejected", rejected_cnt)
+
+    # Filtering pending queue for dialer display
+    pending_df = df[df['Status'].isin(['Pending', 'Callback Required', 'Not Reachable'])].reset_index(drop=True)
+
+    if pending_df.empty:
+        st.balloons()
+        st.success("Great job! All pending leads have been updated.")
+    else:
+        if 'lead_idx' not in st.session_state:
+            st.session_state.lead_idx = 0
+        
+        if st.session_state.lead_idx >= len(pending_df):
+            st.session_state.lead_idx = 0
+            
+        current_lead = pending_df.iloc[st.session_state.lead_idx]
+        
+        col1, col2 = st.columns([1, 1])
+        
+        # Client Info Card
+        with col1:
+            st.subheader("📋 Client Details")
+            st.info(f"**Client ID:** {current_lead['Client_ID']}")
+            st.markdown(f"**Client Name:** {current_lead['Client_Name']}")
+            st.markdown(f"**Phone Number:** `{current_lead['Phone_Number']}`")
+            st.warning(f"**Old Requirement:** {current_lead['Old_Requirement']}")
+            st.error(f"**Rejection Reason (8 Months Ago):** {current_lead['Rejection_Reason']}")
+            
+            phone_no = str(current_lead['Phone_Number']).replace(" ", "")
+            st.markdown(f"[📞 Call Client](tel:{phone_no}) | [💬 Open WhatsApp](https://wa.me/91{phone_no})")
+
+        # Call Action Form
+        with col2:
+            st.subheader("📝 Update Call Status")
+            with st.form("update_form"):
+                new_status = st.selectbox(
+                    "Call Status",
+                    ["Approved/Interested", "Callback Required", "Not Reachable", "Not Interested / Rejected"]
+                )
+                new_req = st.text_area("New Requirement (If Approved)", value=str(current_lead.get('New_Requirement', '')))
+                remarks = st.text_area("Preeti's Remarks / Discussion", value=str(current_lead.get('Preeti_Remarks', '')))
+                next_date = st.date_input("Next Follow-up Date")
+                
+                if st.form_submit_button("Save & Next Lead ➡️"):
+                    idx = st.session_state.leads_data[st.session_state.leads_data['Client_ID'] == current_lead['Client_ID']].index[0]
+                    st.session_state.leads_data.at[idx, 'Status'] = new_status
+                    st.session_state.leads_data.at[idx, 'Preeti_Remarks'] = remarks
+                    st.session_state.leads_data.at[idx, 'New_Requirement'] = new_req
+                    st.session_state.leads_data.at[idx, 'Next_Followup_Date'] = str(next_date)
+                    st.session_state.leads_data.at[idx, 'Calling_Date'] = datetime.today().strftime('%Y-%m-%d')
                     
-                    if st.form_submit_button("Save & Next Lead ➡️"):
-                        # Update temporary session data
-                        idx = st.session_state.leads_data[st.session_state.leads_data['Client_ID'] == current_lead['Client_ID']].index[0]
-                        st.session_state.leads_data.at[idx, 'Status'] = new_status
-                        st.session_state.leads_data.at[idx, 'Preeti_Remarks'] = remarks
-                        st.session_state.leads_data.at[idx, 'New_Requirement'] = new_req
-                        st.session_state.leads_data.at[idx, 'Next_Followup_Date'] = str(next_date)
-                        
-                        st.success("Lead Status Updated!")
-                        st.session_state.lead_idx += 1
-                        st.rerun()
+                    st.success("Lead Status Updated!")
+                    st.session_state.lead_idx += 1
+                    st.rerun()
+
+    # 2. DAILY UTILIZATION & CALLING REPORT (PAGE KE NEECHE)
+    st.markdown("---")
+    st.subheader("📈 Daily Calling Utilization & Report")
+    
+    # Filter out uncalled/blank rows
+    called_df = df[df['Calling_Date'] != ""]
+    
+    if called_df.empty:
+        st.info("No calling activity recorded yet for report generation.")
+    else:
+        # Group by Date to count daily utilization
+        daily_summary = called_df.groupby(['Calling_Date', 'Status']).size().unstack(fill_value=0)
+        st.write("#### Date-wise Call Count & Outcome:")
+        st.dataframe(daily_summary, use_container_width=True)
