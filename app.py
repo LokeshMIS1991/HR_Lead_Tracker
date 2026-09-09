@@ -90,8 +90,8 @@ if page == "📤 Upload Leads (Manager)":
 # ==========================================
 # PAGE 2: PREETI'S CALLING DIALER PORTAL
 # ==========================================
-elif page == "📞 Preeti's Dialer":
-    st.title("📞 Preeti's Lead Calling Portal")
+elif page == "📞 Dialer Form":
+    st.title("📞 Lead Calling Portal")
 
     df = st.session_state.leads_data
 
