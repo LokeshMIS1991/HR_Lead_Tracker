@@ -10,15 +10,16 @@ st.set_page_config(
     layout="wide"
 )
 
-# Connect to Google Sheets
+# Connect to Google Sheets via Streamlit Secrets
 @st.cache_resource
 def get_gspread_client():
-    return gspread.service_account(filename="service_account.json")
+    credentials = dict(st.secrets["gcp_service_account"])
+    return gspread.service_account_from_dict(credentials)
 
 # Connection handling
 try:
     gc = get_gspread_client()
-    # Google Sheet URL / Name connection
+    # Google Sheet Connection using Spreadsheet ID
     sheet = gc.open_by_key("19qxH3Ga3xJrpsbQrqunJ6EpT5PVQXAAFodlZGZcLTzI").sheet1
     gsheets_connected = True
 except Exception as e:
@@ -45,7 +46,7 @@ if page == "📤 Bulk Lead Upload (Manager)":
 
         if st.button("Google Sheet Mein Upload Karein"):
             if not gsheets_connected:
-                st.error("Google Sheet connected nahi hai. Check service_account.json key!")
+                st.error("Google Sheet connected nahi hai. Check Streamlit Secrets key!")
             else:
                 with st.spinner("Data upload ho raha hai..."):
                     existing_records = sheet.get_all_records()
